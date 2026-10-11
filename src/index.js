@@ -1,5 +1,5 @@
 const API_KEY_MIN_LENGTH = 20;
-const REGION_CODE_PATTERN = /^[A-Z]{2}-[A-Z0-9]+$/;
+const REGION_CODE_PATTERN = /^[A-Z]{2}(?:-[A-Z0-9]+)*$/;
 
 function isValidApiKey(apiKey) {
 	return apiKey.trim().length >= API_KEY_MIN_LENGTH;
@@ -12,6 +12,8 @@ function isValidRegionCode(regionCode) {
 function setValidationState(input, feedback, isValid, message) {
 	input.classList.toggle('is-valid', isValid);
 	input.classList.toggle('is-invalid', !isValid);
+	feedback.classList.toggle('is-valid', isValid);
+	feedback.classList.toggle('is-invalid', !isValid);
 	input.setAttribute('aria-invalid', String(!isValid));
 	feedback.textContent = message;
 }
@@ -53,18 +55,22 @@ function setupForm() {
 	});
 
 	form.addEventListener('submit', (event) => {
-		const apiKeyIsValid = validateApiKeyField(apiInput, apiFeedback);
+		event.preventDefault();
+
 		const regionIsValid = validateRegionField(regionInput, regionFeedback);
+		const apiKeyIsValid = validateApiKeyField(apiInput, apiFeedback);
 
-		if (!apiKeyIsValid || !regionIsValid) {
-			event.preventDefault();
-
-			if (!apiKeyIsValid) {
-				apiInput.focus();
-			} else if (!regionIsValid) {
-				regionInput.focus();
-			}
+		if (!regionIsValid) {
+			regionInput.focus();
+			return;
 		}
+
+		if (!apiKeyIsValid) {
+			apiInput.focus();
+			return;
+		}
+
+		// Both fields are valid: the API request / result display goes here.
 	});
 }
 
