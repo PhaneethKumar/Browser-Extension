@@ -64,6 +64,12 @@ const MAX_JITTER_MS = 250;
 const MAX_HISTORY_ENTRIES = 20;
 const HISTORY_DISPLAY_COUNT = 10;
 
+// CO2 intensity scale (grams per kWh) and its matching toolbar-icon colors,
+// from green (clean) to dark brown (high carbon)
+const CO2_SCALE = [0, 150, 600, 750, 800];
+const CO2_COLORS = ['#2AA364', '#F5EB4D', '#9E4229', '#381D02', '#381D02'];
+const DEFAULT_ICON_COLOR = 'green';
+
 /* ---------- DOM references (queried once) ---------- */
 
 const dom = {};
@@ -593,6 +599,62 @@ async function fetchWithRetry(apiKey, region, requestId) {
 	throw lastError;
 }
 
+/* ---------- Toolbar icon ---------- */
+
+/**
+ * Sends a color to the background service worker, which redraws the toolbar icon.
+ * Safe to call outside the extension (tests, plain browser tab).
+ * @param {string} color - Any CSS color.
+ * @returns {void}
+ */
+function sendIconColor(color) {
+	if (typeof chrome === 'undefined' || !chrome.runtime || !chrome.runtime.sendMessage) {
+		return;
+	}
+	try {
+		const result = chrome.runtime.sendMessage({ action: 'updateIcon', value: { color } });
+		if (result && typeof result.catch === 'function') {
+			result.catch((error) => console.warn('Could not update icon', error));
+		}
+	} catch (error) {
+		console.warn('Could not update icon', error);
+	}
+}
+
+/**
+ * Maps a carbon intensity to the color of the closest point on the CO2 scale.
+ * @param {number} value - Grams of CO2 per kWh.
+ * @returns {string} Hex color.
+ */
+function getColorForIntensity(value) {
+	let closestIndex = 0;
+	CO2_SCALE.forEach((point, index) => {
+		if (Math.abs(point - value) < Math.abs(CO2_SCALE[closestIndex] - value)) {
+			closestIndex = index;
+		}
+	});
+	return CO2_COLORS[closestIndex];
+}
+
+/**
+ * Calculates the icon color for a carbon intensity and tells the background script to draw it.
+ * @param {number} value - Grams of CO2 per kWh.
+ * @returns {string} The color that was sent.
+ */
+function calculateColor(value) {
+	const color = getColorForIntensity(value);
+	sendIconColor(color);
+	return color;
+}
+
+/**
+ * Sets the toolbar icon to the default (green) dot.
+ * @returns {void}
+ */
+function setDefaultIconColor() {
+	sendIconColor(DEFAULT_ICON_COLOR);
+}
+
 /* ---------- Display ---------- */
 
 /**
@@ -608,13 +670,16 @@ function formatAge(ms) {
 }
 
 /**
- * Writes carbon data and its source note into the result area.
+ * Writes carbon data and its source note into the result area, and updates
+ * the toolbar icon color to match the carbon intensity.
  * @param {string} region - Region code.
  * @param {CarbonData} data - Data to display.
  * @param {RenderSource} source - Where the data came from.
  * @returns {void}
  */
 function renderResult(region, data, source) {
+	calculateColor(data.carbonIntensity);
+
 	dom.myRegion.textContent = region;
 	dom.carbonUsage.textContent = `${Math.round(data.carbonIntensity)} grams (grams CO2 emitted per kilowatt hour)`;
 	dom.fossilFuel.textContent = `${data.fossilFuelPercentage.toFixed(2)}% (percentage of fossil fuels used to generate electricity)`;
@@ -715,12 +780,15 @@ async function displayCarbonUsage(apiKey, region, options = {}) {
 
 /**
  * Decides the initial view from stored credentials.
+ * First-time users get the default (green) toolbar icon; returning users get
+ * the icon color for their latest data once it is rendered.
  * @returns {void}
  */
 function init() {
 	const { apiKey, region } = getStoredCredentials();
 
 	if (!apiKey || !region) {
+		setDefaultIconColor();
 		showView('setup'); // first-time user
 		return;
 	}
@@ -729,12 +797,14 @@ function init() {
 }
 
 /**
- * Clears credentials and form state, cancels any in-flight request, and returns to setup.
+ * Clears credentials and form state, cancels any in-flight request, resets the
+ * toolbar icon to its default color, and returns to setup.
  * @returns {void}
  */
 function reset() {
 	cancelActiveRequest();
 	clearCredentials();
+	setDefaultIconColor();
 
 	dom.apiInput.value = '';
 	dom.regionInput.value = '';
@@ -812,5 +882,6 @@ if (typeof module !== 'undefined') {
 		isRetryableError,
 		getRetryDelay,
 		formatAge,
+		getColorForIntensity,
 	};
 }
