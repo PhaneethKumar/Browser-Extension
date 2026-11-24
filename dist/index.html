@@ -19,13 +19,19 @@
 			<h2>New? Add your Information</h2>
 		</div>
 		<div>
-			<label for="region">Region Name</label>
-			<input type="text" id="region" required class="region-name" placeholder="e.g. US-NEISO"
-				aria-describedby="region-feedback" />
+			<label for="region">Zone</label>
+			<select id="region" required class="region-name" aria-describedby="region-feedback">
+				<option value="">Select a zone</option>
+				<option value="northern">northern</option>
+				<option value="western">western</option>
+				<option value="southern">southern</option>
+				<option value="eastern">eastern</option>
+				<option value="north-eastern">north-eastern</option>
+			</select>
 			<small id="region-feedback" class="field-feedback" aria-live="polite"></small>
 		</div>
 		<div>
-			<label for="api">Your API Key from tmrow</label>
+			<label for="api">Your India Energy Maps API Key</label>
 			<div class="api-key-container">
 				<input type="password" id="api" required class="api-key" autocomplete="off"
 					aria-describedby="api-feedback" />

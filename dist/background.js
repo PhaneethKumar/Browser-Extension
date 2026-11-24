@@ -5,10 +5,20 @@
 const DEFAULT_COLOR = 'green';
 
 // Listen for messages from the popup
-chrome.runtime.onMessage.addListener(function (msg, sender, sendResponse) {
-    if (msg && msg.action === 'updateIcon' && msg.value && msg.value.color) {
-        chrome.action.setIcon({ imageData: drawIcon(msg.value) });
+chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+    if (!msg || msg.action !== 'updateIcon' || !msg.value?.color) {
+        sendResponse({ success: false, error: 'Invalid message' });
+        return false;
     }
+
+    try {
+        chrome.action.setIcon({ imageData: drawIcon(msg.value) });
+        sendResponse({ success: true });
+    } catch (error) {
+        sendResponse({ success: false, error: error.message });
+    }
+
+    return true;
 });
 
 // Show the default (green) dot as soon as the extension is installed or the browser starts,
